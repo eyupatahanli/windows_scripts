@@ -3,12 +3,12 @@ Add-Type -AssemblyName System.Drawing
 
 function Show-DateSelectionForm {
     $form = New-Object System.Windows.Forms.Form
-    $form.Text = "PDF Taşıma Aracı - Tarih Seçimi"
+    $form.Text = "PDF Transfer Tool - Date Selection"
     $form.Size = New-Object System.Drawing.Size(400, 300)
     $form.StartPosition = "CenterScreen"
 
     $label1 = New-Object System.Windows.Forms.Label
-    $label1.Text = "Kaynak klasörü girin:"
+    $label1.Text = "Enter source folder:"
     $label1.Location = New-Object System.Drawing.Point(10, 20)
     $label1.AutoSize = $true
     $form.Controls.Add($label1)
@@ -16,11 +16,11 @@ function Show-DateSelectionForm {
     $sourceBox = New-Object System.Windows.Forms.TextBox
     $sourceBox.Size = New-Object System.Drawing.Size(350, 20)
     $sourceBox.Location = New-Object System.Drawing.Point(10, 40)
-    $sourceBox.Text = "C:\PDFDosyalar"
+    $sourceBox.Text = ".\PDFDosyalar"
     $form.Controls.Add($sourceBox)
 
     $label2 = New-Object System.Windows.Forms.Label
-    $label2.Text = "Başlangıç tarihi:"
+    $label2.Text = "Start date:"
     $label2.Location = New-Object System.Drawing.Point(10, 80)
     $label2.AutoSize = $true
     $form.Controls.Add($label2)
@@ -31,7 +31,7 @@ function Show-DateSelectionForm {
     $form.Controls.Add($startPicker)
 
     $label3 = New-Object System.Windows.Forms.Label
-    $label3.Text = "Bitiş tarihi:"
+    $label3.Text = "End date:"
     $label3.Location = New-Object System.Drawing.Point(10, 140)
     $label3.AutoSize = $true
     $form.Controls.Add($label3)
@@ -42,7 +42,7 @@ function Show-DateSelectionForm {
     $form.Controls.Add($endPicker)
 
     $okButton = New-Object System.Windows.Forms.Button
-    $okButton.Text = "Dosyaları Taşı"
+    $okButton.Text = "Transfer Files"
     $okButton.Location = New-Object System.Drawing.Point(250, 200)
     $okButton.Add_Click({
         $form.Tag = @{
@@ -58,7 +58,7 @@ function Show-DateSelectionForm {
     return $form.Tag
 }
 
-# Arayüzü çalıştır
+# Run the interface
 $params = Show-DateSelectionForm
 if (-not $params) { exit }
 
@@ -66,14 +66,14 @@ $sourceFolder = $params.SourceFolder
 $startDate = $params.StartDate
 $endDate = $params.EndDate
 
-# Hedef klasör adı
+# Target folder name
 $folderName = "$($startDate.ToString('yyyy-MM-dd'))_$($endDate.ToString('yyyy-MM-dd'))"
 $targetFolder = Join-Path -Path $sourceFolder -ChildPath $folderName
 if (-Not (Test-Path -Path $targetFolder)) {
     New-Item -Path $targetFolder -ItemType Directory | Out-Null
 }
 
-# PDF dosyalarını filtrele ve taşı
+# Filter and move PDF files
 $files = Get-ChildItem -Path $sourceFolder -Filter *.pdf -File
 $counter = 0
 foreach ($file in $files) {
@@ -83,5 +83,11 @@ foreach ($file in $files) {
     }
 }
 
-# Bilgilendirme
-[System.Windows.Forms.MessageBox]::Show("$counter adet PDF dosyası '$folderName' klasörüne taşındı.","İşlem Tamamlandı")
+# Compress moved files
+Compress-Archive -Path "$targetFolder\*" -DestinationPath "$targetFolder.zip" -Force
+
+# Delete original folder
+Remove-Item -Path $targetFolder -Recurse -Force
+
+# Information
+[System.Windows.Forms.MessageBox]::Show("$counter PDF files have been compressed into '$folderName.zip'","Process Completed")

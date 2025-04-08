@@ -258,7 +258,7 @@ function Start-XMLTransfer {
         # Taşınan dosyaları sıkıştır
         if ($counter -gt 0) {
             Write-Log "Sikistiriliyor: $counter dosya -> $folderName.zip"
-            $zipPath = "$targetFolder.zip"
+            $zipPath = Join-Path $sourceFolder "$folderName.zip"
             Compress-Archive -Path "$targetFolder\*" -DestinationPath $zipPath -Force
             $zipSize = (Get-Item $zipPath).Length
             Write-Log "ZIP olusturuldu: $folderName.zip (Boyut: $(Get-FileSize $zipPath))"
@@ -266,6 +266,9 @@ function Start-XMLTransfer {
             # Eğer taşıma seçeneği işaretliyse, ZIP dosyasını hedef klasöre taşı
             if ($moveFiles) {
                 $targetZipPath = Join-Path $targetFolder "$folderName.zip"
+                if (-not (Test-Path $targetFolder)) {
+                    New-Item -Path $targetFolder -ItemType Directory -Force | Out-Null
+                }
                 Move-Item -Path $zipPath -Destination $targetZipPath -Force
                 Write-Log "ZIP dosyasi tasindi: $targetZipPath"
             }

@@ -34,7 +34,7 @@ function Start-XMLTransfer {
     # Form oluştur
     $form = New-Object System.Windows.Forms.Form
     $form.Text = "XML Transfer Tool - Date Selection"
-    $form.Size = New-Object System.Drawing.Size(480, 400)
+    $form.Size = New-Object System.Drawing.Size(480, 450)
     $form.StartPosition = "CenterScreen"
     $form.TopMost = $true
 
@@ -120,6 +120,51 @@ function Start-XMLTransfer {
     $rangeInput.Increment = 1
     $form.Controls.Add($rangeInput)
 
+    # Taşıma seçeneği için checkbox
+    $moveCheckbox = New-Object System.Windows.Forms.CheckBox
+    $moveCheckbox.Text = "ZIP dosyalarini tasi"
+    $moveCheckbox.Location = New-Object System.Drawing.Point(10, 270)
+    $moveCheckbox.AutoSize = $true
+    $form.Controls.Add($moveCheckbox)
+
+    # Hedef klasör seçimi için kontroller
+    $targetLabel = New-Object System.Windows.Forms.Label
+    $targetLabel.Text = "Hedef klasor:"
+    $targetLabel.Location = New-Object System.Drawing.Point(10, 300)
+    $targetLabel.AutoSize = $true
+    $targetLabel.Enabled = $false
+    $form.Controls.Add($targetLabel)
+
+    $targetBox = New-Object System.Windows.Forms.TextBox
+    $targetBox.Size = New-Object System.Drawing.Size(350, 20)
+    $targetBox.Location = New-Object System.Drawing.Point(10, 320)
+    $targetBox.Text = (Get-Location).Path
+    $targetBox.ReadOnly = $true
+    $targetBox.Enabled = $false
+    $form.Controls.Add($targetBox)
+
+    $targetBrowseButton = New-Object System.Windows.Forms.Button
+    $targetBrowseButton.Text = "Browse..."
+    $targetBrowseButton.Location = New-Object System.Drawing.Point(370, 320)
+    $targetBrowseButton.Size = New-Object System.Drawing.Size(80, 20)
+    $targetBrowseButton.Enabled = $false
+    $targetBrowseButton.Add_Click({
+        $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
+        $folderBrowser.Description = "Hedef klasoru secin"
+        $folderBrowser.ShowNewFolderButton = $true
+        if ($folderBrowser.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+            $targetBox.Text = $folderBrowser.SelectedPath
+        }
+    })
+    $form.Controls.Add($targetBrowseButton)
+
+    # Checkbox değişikliğinde kontrolleri etkinleştir/devre dışı bırak
+    $moveCheckbox.Add_CheckedChanged({
+        $targetLabel.Enabled = $moveCheckbox.Checked
+        $targetBox.Enabled = $moveCheckbox.Checked
+        $targetBrowseButton.Enabled = $moveCheckbox.Checked
+    })
+
     $dateFormatCombo.Add_SelectedIndexChanged({
         $startPicker.CustomFormat = $dateFormatCombo.SelectedItem
         $endPicker.CustomFormat = $dateFormatCombo.SelectedItem
@@ -135,6 +180,8 @@ function Start-XMLTransfer {
             EndDate = $endPicker.Value.Date
             RangeDays = [int]$rangeInput.Value
             DateFormat = $dateFormatCombo.SelectedItem
+            MoveFiles = $moveCheckbox.Checked
+            TargetFolder = $targetBox.Text
         }
         $form.Close()
     })
@@ -155,6 +202,8 @@ function Start-XMLTransfer {
     $endDate = $params.EndDate
     $rangeDays = $params.RangeDays
     $dateFormat = $params.DateFormat
+    $moveFiles = $params.MoveFiles
+    $targetFolder = $params.TargetFolder
 
     Write-Log "XML Transfer islemi baslatiliyor..."
     Write-Log "Kaynak klasor: $sourceFolder"
@@ -209,9 +258,18 @@ function Start-XMLTransfer {
         # Taşınan dosyaları sıkıştır
         if ($counter -gt 0) {
             Write-Log "Sikistiriliyor: $counter dosya -> $folderName.zip"
-            Compress-Archive -Path "$targetFolder\*" -DestinationPath "$targetFolder.zip" -Force
-            $zipSize = (Get-Item "$targetFolder.zip").Length
-            Write-Log "ZIP olusturuldu: $folderName.zip (Boyut: $(Get-FileSize "$targetFolder.zip"))"
+            $zipPath = "$targetFolder.zip"
+            Compress-Archive -Path "$targetFolder\*" -DestinationPath $zipPath -Force
+            $zipSize = (Get-Item $zipPath).Length
+            Write-Log "ZIP olusturuldu: $folderName.zip (Boyut: $(Get-FileSize $zipPath))"
+            
+            # Eğer taşıma seçeneği işaretliyse, ZIP dosyasını hedef klasöre taşı
+            if ($moveFiles) {
+                $targetZipPath = Join-Path $targetFolder "$folderName.zip"
+                Move-Item -Path $zipPath -Destination $targetZipPath -Force
+                Write-Log "ZIP dosyasi tasindi: $targetZipPath"
+            }
+            
             Remove-Item -Path $targetFolder -Recurse -Force
             Write-Log "Gecici klasor silindi: $folderName"
             $totalFiles += $counter

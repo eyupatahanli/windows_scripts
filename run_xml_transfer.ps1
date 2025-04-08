@@ -130,7 +130,7 @@ function Start-XMLTransfer {
     $params = $form.Tag
     
     if (-not $params) { 
-        Write-Log "İşlem iptal edildi."
+        Write-Log "Islem iptal edildi."
         return 
     }
 
@@ -141,10 +141,10 @@ function Start-XMLTransfer {
     $rangeDays = $params.RangeDays
     $dateFormat = $params.DateFormat
 
-    Write-Log "XML Transfer işlemi başlatılıyor..."
-    Write-Log "Kaynak klasör: $sourceFolder"
-    Write-Log "Tarih aralığı: $($startDate.ToString($dateFormat)) - $($endDate.ToString($dateFormat))"
-    Write-Log "Bölme aralığı: $rangeDays gün"
+    Write-Log "XML Transfer islemi baslatiliyor..."
+    Write-Log "Kaynak klasor: $sourceFolder"
+    Write-Log "Tarih araligi: $($startDate.ToString($dateFormat)) - $($endDate.ToString($dateFormat))"
+    Write-Log "Bolme araligi: $rangeDays gun"
 
     # Tarih aralıklarını hesapla
     $dateRanges = @()
@@ -161,19 +161,19 @@ function Start-XMLTransfer {
         $currentStart = $currentEnd.AddDays(1)
     }
 
-    Write-Log "Toplam $($dateRanges.Count) tarih aralığı işlenecek"
+    Write-Log "Toplam $($dateRanges.Count) tarih araligi islenecek"
 
     # Her tarih aralığını işle
     $totalFiles = 0
     $totalSize = 0
     foreach ($range in $dateRanges) {
-        Write-Log "İşleniyor: $($range.Start.ToString($dateFormat)) - $($range.End.ToString($dateFormat))"
+        Write-Log "Isleniyor: $($range.Start.ToString($dateFormat)) - $($range.End.ToString($dateFormat))"
         
         $folderName = "$($range.Start.ToString('MM-dd-yyyy'))_$($range.End.ToString('MM-dd-yyyy'))"
         $targetFolder = Join-Path -Path $sourceFolder -ChildPath $folderName
         if (-Not (Test-Path -Path $targetFolder)) {
             New-Item -Path $targetFolder -ItemType Directory | Out-Null
-            Write-Log "Klasör oluşturuldu: $folderName"
+            Write-Log "Klasor olusturuldu: $folderName"
         }
 
         # XML dosyalarını filtrele ve taşı
@@ -186,33 +186,33 @@ function Start-XMLTransfer {
                 $rangeSize += $fileSize
                 Move-Item -Path $file.FullName -Destination (Join-Path $targetFolder $file.Name)
                 $counter++
-                Write-Log "Taşındı: $($file.Name) (Boyut: $(Get-FileSize $file.FullName))"
+                Write-Log "Tasindi: $($file.Name) (Boyut: $(Get-FileSize $file.FullName))"
             }
         }
 
         # Taşınan dosyaları sıkıştır
         if ($counter -gt 0) {
-            Write-Log "Sıkıştırılıyor: $counter dosya -> $folderName.zip"
+            Write-Log "Sikistiriliyor: $counter dosya -> $folderName.zip"
             Compress-Archive -Path "$targetFolder\*" -DestinationPath "$targetFolder.zip" -Force
             $zipSize = (Get-Item "$targetFolder.zip").Length
-            Write-Log "ZIP oluşturuldu: $folderName.zip (Boyut: $(Get-FileSize "$targetFolder.zip"))"
+            Write-Log "ZIP olusturuldu: $folderName.zip (Boyut: $(Get-FileSize "$targetFolder.zip"))"
             Remove-Item -Path $targetFolder -Recurse -Force
-            Write-Log "Geçici klasör silindi: $folderName"
+            Write-Log "Gecici klasor silindi: $folderName"
             $totalFiles += $counter
             $totalSize += $rangeSize
         } else {
-            Write-Log "Bu tarih aralığında dosya bulunamadı"
+            Write-Log "Bu tarih araliginda dosya bulunamadi"
         }
     }
 
     # Özet bilgiler
-    Write-Log "İşlem tamamlandı!"
-    Write-Log "Toplam işlenen dosya: $totalFiles"
+    Write-Log "Islem tamamlandi!"
+    Write-Log "Toplam islenen dosya: $totalFiles"
     Write-Log "Toplam boyut: $(Get-FileSize $totalSize)"
-    Write-Log "Oluşturulan ZIP sayısı: $($dateRanges.Count)"
+    Write-Log "Olusturulan ZIP sayisi: $($dateRanges.Count)"
 
     # Bilgi mesajı
-    [System.Windows.Forms.MessageBox]::Show("Toplam $totalFiles XML dosyası $($dateRanges.Count) ZIP dosyasına sıkıştırıldı.","İşlem Tamamlandı")
+    [System.Windows.Forms.MessageBox]::Show("Toplam $totalFiles XML dosyasi $($dateRanges.Count) ZIP dosyasina sikistirildi.","Islem Tamamlandi")
 }
 
 # Script'i çalıştır

@@ -257,27 +257,54 @@ function Start-XMLTransfer {
 
         # Taşınan dosyaları sıkıştır
         if ($counter -gt 0) {
-            Write-Log "Sikistiriliyor: $counter dosya -> $folderName.zip"
-            $zipPath = Join-Path $sourceFolder "$folderName.zip"
-            Compress-Archive -Path "$targetFolder\*" -DestinationPath $zipPath -Force
-            $zipSize = (Get-Item $zipPath).Length
-            Write-Log "ZIP olusturuldu: $folderName.zip (Boyut: $(Get-FileSize $zipPath))"
-            
-            # Eğer taşıma seçeneği işaretliyse, ZIP dosyasını hedef klasöre taşı
-            if ($moveFiles) {
-                $targetZipPath = Join-Path $targetFolder "$folderName.zip"
-                if (-not (Test-Path $targetFolder)) {
-                    New-Item -Path $targetFolder -ItemType Directory -Force | Out-Null
+            try {
+                Write-Log "Sikistiriliyor: $counter dosya -> $folderName.zip"
+                $zipPath = Join-Path $sourceFolder "$folderName.zip"
+                Compress-Archive -Path "$targetFolder\*" -DestinationPath $zipPath -Force
+                $zipSize = (Get-Item $zipPath).Length
+                Write-Log "ZIP olusturuldu: $folderName.zip (Boyut: $(Get-FileSize $zipPath))"
+                
+                # Eğer taşıma seçeneği işaretliyse, ZIP dosyasını hedef klasöre kopyala
+                if ($moveFiles) {
+                    $targetZipPath = Join-Path $targetFolder "$folderName.zip"
+                    if (-not (Test-Path $targetFolder)) {
+                        New-Item -Path $targetFolder -ItemType Directory -Force | Out-Null
+                    }
+                    
+                    # Önce kopyala
+                    Copy-Item -Path $zipPath -Destination $targetZipPath -Force
+                    Write-Log "ZIP dosyasi kopyalandi: $targetZipPath"
+                    
+                    # Kopyalama başarılı olduysa kaynak ZIP'i sil
+                    if (Test-Path $targetZipPath) {
+                        Remove-Item -Path $zipPath -Force
+                        Write-Log "Kaynak ZIP dosyasi silindi"
+                    }
+                } else {
+                    # Taşıma seçeneği işaretli değilse, ZIP dosyasını sil
+                    Remove-Item -Path $zipPath -Force
                 }
-                Move-Item -Path $zipPath -Destination $targetZipPath -Force
-                Write-Log "ZIP dosyasi tasindi: $targetZipPath"
-            } else {
-                # Taşıma seçeneği işaretli değilse, ZIP dosyasını sil
-                Remove-Item -Path $zipPath -Force
+                
+                # Geçici klasörü sil
+                Remove-Item -Path $targetFolder -Recurse -Force
+                Write-Log "Gecici klasor silindi: $folderName"
             }
-            
-            Remove-Item -Path $targetFolder -Recurse -Force
-            Write-Log "Gecici klasor silindi: $folderName"
+            catch {
+                Write-Log "HATA: $($_.Exception.Message)"
+                Write-Log "Hata Detayi: $($_.Exception.Message)"
+                Write-Log "Satir: $($_.InvocationInfo.ScriptLineNumber)"
+                Write-Log "Komut: $($_.InvocationInfo.Line)"
+                
+                # Hata durumunda geçici dosyaları temizle
+                if (Test-Path $zipPath) {
+                    Remove-Item -Path $zipPath -Force
+                }
+                if (Test-Path $targetFolder) {
+                    Remove-Item -Path $targetFolder -Recurse -Force
+                }
+                
+                throw $_
+            }
             $totalFiles += $counter
             $totalSize += $rangeSize
         } else {

@@ -271,6 +271,9 @@ function Start-XMLTransfer {
                 }
                 Move-Item -Path $zipPath -Destination $targetZipPath -Force
                 Write-Log "ZIP dosyasi tasindi: $targetZipPath"
+            } else {
+                # Taşıma seçeneği işaretli değilse, ZIP dosyasını sil
+                Remove-Item -Path $zipPath -Force
             }
             
             Remove-Item -Path $targetFolder -Recurse -Force

@@ -34,7 +34,7 @@ function Start-XMLTransfer {
     # Form oluştur
     $form = New-Object System.Windows.Forms.Form
     $form.Text = "XML Transfer Tool - Date Selection"
-    $form.Size = New-Object System.Drawing.Size(400, 400)
+    $form.Size = New-Object System.Drawing.Size(480, 400)
     $form.StartPosition = "CenterScreen"
     $form.TopMost = $true
 
@@ -51,6 +51,21 @@ function Start-XMLTransfer {
     $sourceBox.Text = (Get-Location).Path
     $sourceBox.ReadOnly = $true
     $form.Controls.Add($sourceBox)
+
+    # Klasör seçme butonu ekle
+    $browseButton = New-Object System.Windows.Forms.Button
+    $browseButton.Text = "Browse..."
+    $browseButton.Location = New-Object System.Drawing.Point(370, 40)
+    $browseButton.Size = New-Object System.Drawing.Size(80, 20)
+    $browseButton.Add_Click({
+        $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
+        $folderBrowser.Description = "Kaynak klasoru secin"
+        $folderBrowser.ShowNewFolderButton = $false
+        if ($folderBrowser.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+            $sourceBox.Text = $folderBrowser.SelectedPath
+        }
+    })
+    $form.Controls.Add($browseButton)
 
     $labelDateFormat = New-Object System.Windows.Forms.Label
     $labelDateFormat.Text = "Date format:"

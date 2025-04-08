@@ -199,9 +199,10 @@ function Start-XMLTransfer {
             if ($file.LastWriteTime.Date -ge $range.Start -and $file.LastWriteTime.Date -le $range.End) {
                 $fileSize = $file.Length
                 $rangeSize += $fileSize
-                Move-Item -Path $file.FullName -Destination (Join-Path $targetFolder $file.Name)
+                $targetPath = Join-Path $targetFolder $file.Name
+                Move-Item -Path $file.FullName -Destination $targetPath
                 $counter++
-                Write-Log "Tasindi: $($file.Name) (Boyut: $(Get-FileSize $file.FullName))"
+                Write-Log "Tasindi: $($file.Name) (Boyut: $(Get-FileSize $targetPath))"
             }
         }
 

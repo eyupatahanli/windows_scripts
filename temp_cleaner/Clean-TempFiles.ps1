@@ -1,11 +1,11 @@
-# newUserPkList.xml dosyalarını temizleyen PowerShell script
+# newUserPkList.xml dosyalarini temizleyen PowerShell script
 param(
     [string]$BasePath = "C:\ProgramData\YourApp",  # Ana dizin
-    [string]$TargetFileName = "newUserPkList.xml",  # Aranacak dosya adı
+    [string]$TargetFileName = "newUserPkList.xml",  # Aranacak dosya adi
     [int]$IntervalMinutes = 60
 )
 
-# Log dosyası yolu
+# Log dosyasi yolu
 $LogFile = Join-Path $PSScriptRoot "cleanup.log"
 
 # Log fonksiyonu
@@ -18,28 +18,28 @@ function Write-Log {
 
 # Temizleme fonksiyonu
 function Clean-XmlFiles {
-    # Tüm alt klasörlerdeki newUserPkList.xml dosyalarını bul
+    # Tum alt klasorlerdeki newUserPkList.xml dosyalarini bul
     $AllXmlFiles = Get-ChildItem -Path $BasePath -Recurse -Filter $TargetFileName -File -ErrorAction SilentlyContinue
     
     if ($AllXmlFiles.Count -eq 0) {
-        Write-Log "UYARI: Hiç $TargetFileName dosyası bulunamadı."
+        Write-Log "UYARI: Hic $TargetFileName dosyasi bulunamadi."
         return
     }
     
-    # Dosyaları son yazılma tarihine göre sırala
+    # Dosyalari son yazilma tarihine gore siralama
     $SortedFiles = $AllXmlFiles | Sort-Object LastWriteTime -Descending
     
-    # En son yazılan dosyayı bul
+    # En son yazilan dosyayi bul
     $LatestFile = $SortedFiles[0]
     $LatestFolder = $LatestFile.DirectoryName
     
-    Write-Log "En son yazılan dosya: $($LatestFile.FullName)"
-    Write-Log "Korunacak klasör: $LatestFolder"
+    Write-Log "En son yazilan dosya: $($LatestFile.FullName)"
+    Write-Log "Korunacak klasor: $LatestFolder"
     
-    # BasePath içindeki tüm klasörleri bul
+    # BasePath icindeki tum klasorleri bul
     $AllFolders = Get-ChildItem -Path $BasePath -Directory -Recurse -ErrorAction SilentlyContinue
     
-    # En son yazılan dosyanın bulunduğu klasörü ve üst klasörlerini koru
+    # En son yazilan dosyanin bulundugu klasoru ve ust klasorlerini koru
     $FoldersToKeep = @()
     $CurrentFolder = $LatestFolder
     
@@ -49,37 +49,37 @@ function Clean-XmlFiles {
     }
     $FoldersToKeep += $BasePath
     
-    # Klasörleri sil
+    # Klasorleri sil
     foreach ($Folder in $AllFolders) {
         $FolderPath = $Folder.FullName
         
-        # Eğer klasör korunacak klasörler listesinde değilse sil
+        # Eger klasor korunacak klasorler listesinde degilse sil
         if ($FolderPath -notin $FoldersToKeep) {
             try {
                 Remove-Item $FolderPath -Recurse -Force
-                Write-Log "Klasör silindi: $FolderPath"
+                Write-Log "Klasor silindi: $FolderPath"
             }
             catch {
-                Write-Log "HATA: Klasör silinirken hata oluştu $FolderPath - $($_.Exception.Message)"
+                Write-Log "HATA: Klasor silinirken hata olustu $FolderPath - $($_.Exception.Message)"
             }
         }
         else {
-            Write-Log "Klasör korundu: $FolderPath"
+            Write-Log "Klasor korundu: $FolderPath"
         }
     }
 }
 
-# Ana dizinin varlığını kontrol et
+# Ana dizinin varligini kontrol et
 if (-not (Test-Path $BasePath)) {
-    Write-Log "HATA: Ana dizin bulunamadı: $BasePath"
+    Write-Log "HATA: Ana dizin bulunamadi: $BasePath"
     exit 1
 }
 
-# Ana döngü
-Write-Log "XML temizleyici başlatıldı"
+# Ana dongu
+Write-Log "XML temizleyici baslatildi"
 Write-Log "Ana dizin: $BasePath"
 Write-Log "Hedef dosya: $TargetFileName"
-Write-Log "Temizleme aralığı: $IntervalMinutes dakika"
+Write-Log "Temizleme araligi: $IntervalMinutes dakika"
 
 while ($true) {
     Clean-XmlFiles

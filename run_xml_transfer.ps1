@@ -1,3 +1,4 @@
+# XML Transfer Tool v1.0.0
 # Hata ayiklama ayarlari
 $ErrorActionPreference = "Stop"
 $VerbosePreference = "Continue"

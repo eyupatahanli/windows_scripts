@@ -60,7 +60,7 @@ function Clean-XmlFiles {
                 Write-Log "Klasör silindi: $FolderPath"
             }
             catch {
-                Write-Log "HATA: Klasör silinirken hata oluştu $FolderPath: $_"
+                Write-Log "HATA: Klasör silinirken hata oluştu $FolderPath - $($_.Exception.Message)"
             }
         }
         else {

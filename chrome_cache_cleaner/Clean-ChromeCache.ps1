@@ -1,10 +1,10 @@
-# Chrome onbellek temizleyici script
+# Chrome önbellek temizleme script'i
 param(
-    [string]$UsersPath = "C:\Users",  # Kullanicilarin bulundugu ana dizin
-    [switch]$WaitForKeyPress = $false  # Islem bitince bir tusa basilmasi icin bekle
+    [string]$UsersPath = "C:\Users",
+    [switch]$WaitForKeyPress
 )
 
-# Log dosyasi yolu
+# Log dosyası yolu
 $LogFile = Join-Path $PSScriptRoot "chrome_cache_cleanup.log"
 
 # Log fonksiyonu
@@ -15,76 +15,85 @@ function Write-Log {
     Write-Host $LogMessage
 }
 
-# Boyut formatlama fonksiyonu
+# Dosya boyutunu formatla
 function Format-FileSize {
     param([long]$Size)
-    
-    if ($Size -lt 1KB) { return "$Size B" }
-    elseif ($Size -lt 1MB) { return "$([math]::Round($Size / 1KB, 2)) KB" }
-    elseif ($Size -lt 1GB) { return "$([math]::Round($Size / 1MB, 2)) MB" }
-    else { return "$([math]::Round($Size / 1GB, 2)) GB" }
+    $Sizes = @('B', 'KB', 'MB', 'GB', 'TB')
+    $Index = 0
+    while ($Size -ge 1024 -and $Index -lt ($Sizes.Count - 1)) {
+        $Size = $Size / 1024
+        $Index++
+    }
+    return "{0:N2} {1}" -f $Size, $Sizes[$Index]
 }
 
-# Chrome onbellek temizleme fonksiyonu
+# Chrome'un çalışıp çalışmadığını kontrol et
+function Test-ChromeRunning {
+    $chromeProcesses = Get-Process chrome -ErrorAction SilentlyContinue
+    if ($chromeProcesses) {
+        Write-Log "UYARI: Chrome çalışıyor. Lütfen Chrome'u kapatın ve tekrar deneyin."
+        return $true
+    }
+    return $false
+}
+
+# Ana temizleme fonksiyonu
 function Clean-ChromeCache {
-    # Tum kullanici klasorlerini bul
-    $UserFolders = Get-ChildItem -Path $UsersPath -Directory -ErrorAction SilentlyContinue
-    $TotalFilesCleaned = 0
-    $TotalUsersProcessed = 0
-    $TotalSizeCleaned = 0
-    
-    foreach ($UserFolder in $UserFolders) {
-        $ChromeCachePath = Join-Path $UserFolder.FullName "AppData\Local\Google\Chrome\User Data\Default\Cache\Cache_Data"
+    param(
+        [string]$UsersPath
+    )
+
+    # Chrome çalışıyor mu kontrol et
+    if (Test-ChromeRunning) {
+        return
+    }
+
+    $TotalUsers = 0
+    $TotalFiles = 0
+    $TotalSize = 0
+
+    Write-Log "Chrome önbellek temizleme başlatıldı..."
+    Write-Log "Kullanıcı klasörü: $UsersPath"
+
+    # Tüm kullanıcı klasörlerini tara
+    Get-ChildItem -Path $UsersPath -Directory | ForEach-Object {
+        $UserProfile = $_.FullName
+        $ChromePath = Join-Path $UserProfile "AppData\Local\Google\Chrome\User Data\Default\Cache"
         
-        # Chrome onbellek klasorunun varligini kontrol et
-        if (Test-Path $ChromeCachePath) {
-            try {
-                # Onbellek dosyalarini sil
-                $Files = Get-ChildItem -Path $ChromeCachePath -File -ErrorAction SilentlyContinue
-                $FileCount = $Files.Count
-                $TotalFilesCleaned += $FileCount
-                $TotalUsersProcessed++
-                
-                # Dosya boyutlarini hesapla
-                $FolderSize = 0
-                foreach ($File in $Files) {
-                    $FolderSize += $File.Length
+        if (Test-Path $ChromePath) {
+            $TotalUsers++
+            $UserFiles = 0
+            $UserSize = 0
+            
+            Write-Log "Kullanıcı klasörü bulundu: $UserProfile"
+            
+            # Cache klasöründeki tüm dosyaları tara
+            Get-ChildItem -Path $ChromePath -Recurse -File | ForEach-Object {
+                try {
+                    $FileSize = $_.Length
+                    Remove-Item $_.FullName -Force -ErrorAction Stop
+                    $TotalFiles++
+                    $UserFiles++
+                    $TotalSize += $FileSize
+                    $UserSize += $FileSize
                 }
-                $TotalSizeCleaned += $FolderSize
-                
-                foreach ($File in $Files) {
-                    try {
-                        Remove-Item $File.FullName -Force
-                    }
-                    catch {
-                        Write-Log "HATA: Dosya silinirken hata olustu $($File.FullName) - $($_.Exception.Message)"
-                    }
+                catch {
+                    Write-Log "HATA: $($_.FullName) dosyası silinemedi: $($_.Exception.Message)"
                 }
-                
-                Write-Log "Kullanici: $($UserFolder.Name) - $FileCount dosya silindi (Toplam: $(Format-FileSize $FolderSize))"
             }
-            catch {
-                Write-Log "HATA: $ChromeCachePath klasoru islenirken hata olustu - $($_.Exception.Message)"
-            }
+            
+            Write-Log "Kullanici: $($_.Name) - $UserFiles dosya silindi (Toplam: $(Format-FileSize $UserSize))"
         }
     }
-    
-    Write-Log "Islem tamamlandi. Toplam $TotalUsersProcessed kullanici islendi, $TotalFilesCleaned dosya silindi."
-    Write-Log "Toplam temizlenen alan: $(Format-FileSize $TotalSizeCleaned)"
+
+    Write-Log "Islem tamamlandi. Toplam $TotalUsers kullanici islendi, $TotalFiles dosya silindi."
+    Write-Log "Toplam temizlenen alan: $(Format-FileSize $TotalSize)"
 }
 
-# Ana dizinin varligini kontrol et
-if (-not (Test-Path $UsersPath)) {
-    Write-Log "HATA: Kullanicilar dizini bulunamadi: $UsersPath"
-    exit 1
-}
+# Script'i çalıştır
+Clean-ChromeCache -UsersPath $UsersPath
 
-# Script'i calistir
-Write-Log "Chrome onbellek temizleyici baslatildi"
-Write-Log "Kullanicilar dizini: $UsersPath"
-Clean-ChromeCache
-
-# Eger WaitForKeyPress parametresi verildiyse, bir tusa basilmasi icin bekle
+# Eğer WaitForKeyPress parametresi verildiyse, bir tuşa basılmasını bekle
 if ($WaitForKeyPress) {
     Write-Host "`nIslem tamamlandi. Cikmak icin bir tusa basin..."
     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")

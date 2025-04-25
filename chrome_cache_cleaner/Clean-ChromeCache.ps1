@@ -27,14 +27,47 @@ function Format-FileSize {
     return "{0:N2} {1}" -f $Size, $Sizes[$Index]
 }
 
-# Chrome'un çalışıp çalışmadığını kontrol et
-function Test-ChromeRunning {
-    $chromeProcesses = Get-Process chrome -ErrorAction SilentlyContinue
+# Belirli bir kullanıcının Chrome'unun çalışıp çalışmadığını kontrol et
+function Test-UserChromeRunning {
+    param([string]$Username)
+    $chromeProcesses = Get-Process chrome -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "*$Username*" }
     if ($chromeProcesses) {
-        Write-Log "UYARI: Chrome çalışıyor. Lütfen Chrome'u kapatın ve tekrar deneyin."
+        Write-Log "UYARI: $Username kullanıcısının Chrome'u çalışıyor. Bu kullanıcı atlanacak."
         return $true
     }
     return $false
+}
+
+# Belirtilen klasördeki dosyaları temizle
+function Clean-Directory {
+    param(
+        [string]$Path,
+        [string]$Description
+    )
+    
+    if (Test-Path $Path) {
+        $Files = Get-ChildItem -Path $Path -Recurse -File
+        $FileCount = $Files.Count
+        $TotalSize = 0
+        
+        foreach ($File in $Files) {
+            try {
+                $FileSize = $File.Length
+                Remove-Item $File.FullName -Force -ErrorAction Stop
+                $TotalSize += $FileSize
+            }
+            catch {
+                Write-Log "HATA: $($File.FullName) dosyası silinemedi: $($_.Exception.Message)"
+            }
+        }
+        
+        return @{
+            Count = $FileCount
+            Size = $TotalSize
+            Description = $Description
+        }
+    }
+    return $null
 }
 
 # Ana temizleme fonksiyonu
@@ -43,14 +76,10 @@ function Clean-ChromeCache {
         [string]$UsersPath
     )
 
-    # Chrome çalışıyor mu kontrol et
-    if (Test-ChromeRunning) {
-        return
-    }
-
     $TotalUsers = 0
     $TotalFiles = 0
     $TotalSize = 0
+    $SkippedUsers = 0
 
     Write-Log "Chrome önbellek temizleme başlatıldı..."
     Write-Log "Kullanıcı klasörü: $UsersPath"
@@ -58,35 +87,51 @@ function Clean-ChromeCache {
     # Tüm kullanıcı klasörlerini tara
     Get-ChildItem -Path $UsersPath -Directory | ForEach-Object {
         $UserProfile = $_.FullName
-        $ChromePath = Join-Path $UserProfile "AppData\Local\Google\Chrome\User Data\Default\Cache"
+        $Username = $_.Name
+        $ChromeBasePath = Join-Path $UserProfile "AppData\Local\Google\Chrome\User Data\Default"
         
-        if (Test-Path $ChromePath) {
+        if (Test-Path $ChromeBasePath) {
+            # Kullanıcının Chrome'u çalışıyor mu kontrol et
+            if (Test-UserChromeRunning -Username $Username) {
+                $SkippedUsers++
+                return
+            }
+
             $TotalUsers++
             $UserFiles = 0
             $UserSize = 0
             
             Write-Log "Kullanıcı klasörü bulundu: $UserProfile"
             
-            # Cache klasöründeki tüm dosyaları tara
-            Get-ChildItem -Path $ChromePath -Recurse -File | ForEach-Object {
-                try {
-                    $FileSize = $_.Length
-                    Remove-Item $_.FullName -Force -ErrorAction Stop
-                    $TotalFiles++
-                    $UserFiles++
-                    $TotalSize += $FileSize
-                    $UserSize += $FileSize
+            # Cache klasörlerini temizle
+            $CachePaths = @(
+                @{
+                    Path = Join-Path $ChromeBasePath "Cache"
+                    Description = "Genel önbellek"
+                },
+                @{
+                    Path = Join-Path $ChromeBasePath "Code Cache\js"
+                    Description = "JavaScript önbellek"
                 }
-                catch {
-                    Write-Log "HATA: $($_.FullName) dosyası silinemedi: $($_.Exception.Message)"
+            )
+            
+            foreach ($CachePath in $CachePaths) {
+                $Result = Clean-Directory -Path $CachePath.Path -Description $CachePath.Description
+                if ($Result) {
+                    $UserFiles += $Result.Count
+                    $UserSize += $Result.Size
+                    Write-Log "Kullanici: $Username - $($Result.Description): $($Result.Count) dosya silindi (Boyut: $(Format-FileSize $Result.Size))"
                 }
             }
             
-            Write-Log "Kullanici: $($_.Name) - $UserFiles dosya silindi (Toplam: $(Format-FileSize $UserSize))"
+            $TotalFiles += $UserFiles
+            $TotalSize += $UserSize
+            
+            Write-Log "Kullanici: $Username - Toplam $UserFiles dosya silindi (Toplam: $(Format-FileSize $UserSize))"
         }
     }
 
-    Write-Log "Islem tamamlandi. Toplam $TotalUsers kullanici islendi, $TotalFiles dosya silindi."
+    Write-Log "Islem tamamlandi. Toplam $TotalUsers kullanici islendi, $SkippedUsers kullanici atlandi, $TotalFiles dosya silindi."
     Write-Log "Toplam temizlenen alan: $(Format-FileSize $TotalSize)"
 }
 
